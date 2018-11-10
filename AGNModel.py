@@ -16,20 +16,42 @@ class PhysicalConstants:
         self.pc = 3.0859999515706286e+18
 
 
-class AccretionDisk:
+class AGNComponent:
     def __init__(self):
+        self._name = ""
+        self._redshift = 0.
+        self._viewangle = 0.
+        self._f2l = 1.
+
+    def _observe(self, z, v, f2l):
+        self._redshift = z
+        self._viewangle = v
+        self._f2l = f2l
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    def spectrum(self, args):
+        print("Error: this method must be implemented in derived classes")
+
+
+class AccretionDisk(AGNComponent):
+    def __init__(self):
+        AGNComponent.__init__(self)
         self.defaultValues()
 
-    # -----------------------
     def defaultValues(self):
-        self._redshift = 1.
         self._bhmass = 1.e8
         self._accrate = 0.1
         self._rin = 6.
         self._rout = 1000.
         self.luminosity = 3.e44
 
-    # -----------------------
     @property
     def bh_logmass(self): # [log M_sun]
         return math.log10(self._bhmass)
@@ -48,7 +70,6 @@ class AccretionDisk:
         p = PhysicalConstants()
         return self.grav_radius_cm / (p.c * 3600.)
 
-    # -----------------------
     @property
     def rin(self): # [R_g, 6:Schwarzschild, 1:Maximally rotating, 9:Maximally counter-rotating]
         return self._rin
@@ -72,7 +93,6 @@ class AccretionDisk:
     def radiative_efficiency(self):
         return (1. / self._rin - 3. / self._rout) / 2.
 
-    # -----------------------
     @property
     def accrate(self): # [M_sun yr^-1]
         return self._accrate
@@ -109,8 +129,8 @@ class AccretionDisk:
         p = PhysicalConstants()
         self.luminosity = value * self._bhmass * p.eddington
 
-    # -----------------------
-    def intrinsic_spectrum(self, restlambda):
+    def spectrum(self, wavelength):
+        restlambda = wavelength / (1. + self._redshift)
         p = PhysicalConstants()
         Mass = self._bhmass * p.sunmass # BH mass in g
 
@@ -142,6 +162,9 @@ class AccretionDisk:
             bb = 2. * p.h * freq**3 / p.c**2 / (np.exp(p.h * freq / (p.k * t)) - 1)
             spec[i] = 4. * 3.1416**2. * simps(r * bb, r)
         spec *= p.c * 1.e8 / restlambda / restlambda
+
+        if self._f2l > 0:
+            spec *= self._f2l * 2. * math.cos(self._viewangle * 3.1416/180)
         return spec
 
 
@@ -200,7 +223,7 @@ class EmissionLineGaussian(EmissionLine):
     def __init__(self, label, wavelength):
         EmissionLine.__init__(self, label, wavelength)
 
-    def intrinsic_spectrum(self, restlambda):
+    def spectrum(self, restlambda):
         p = PhysicalConstants()
         sigma = self.fwhm * 1.e5 / p.c * self.wavelength / 2.35
         ee = ((restlambda - self.wavelength) / sigma)**2. / 2.
@@ -209,13 +232,14 @@ class EmissionLineGaussian(EmissionLine):
 
 
 # ====================================================================
-class LineRegion:
+class LineRegion(AGNComponent):
     def _addLine(self, label, wavelength, norm):
         tmp = EmissionLineGaussian(label, wavelength)
         tmp.luminosity = norm
         self._lines.append(tmp)
 
     def __init__(self):
+        AGNComponent.__init__(self)
         self._lines  = []
         self.fwhm = 5000.
         self.voff = 0.
@@ -251,17 +275,19 @@ class LineRegion:
             raise ValueError("Voff must be a positive number")
         self._voff = value
 
-    def intrinsic_spectrum(self, restlambda):
+    def spectrum(self, wavelength):
+        restlambda = wavelength / (1. + self._redshift)
         spec = np.arange(restlambda.size, dtype=float)
         spec *= 0.
         for line in self._lines:
             line.fwhm = self._fwhm
             line.voff = self._voff
-            spec += line.intrinsic_spectrum(restlambda)
-        spec *= self._lum
+            spec += line.spectrum(restlambda)
+        spec *= self._f2l * self._lum 
         return spec
 
 
+# ====================================================================
 class BroadLineRegion(LineRegion):
     def defaultValues(self):
         self._addLine("Lya"       , 1215.24  , 1.)     # BN
@@ -285,6 +311,7 @@ class BroadLineRegion(LineRegion):
         self.luminosity = 1.e42
 
 
+# ====================================================================
 class NarrowLineRegion(LineRegion):
     def defaultValues(self):
         self._addLine("Lya"       , 1215.24  , 1.)    # BN
@@ -308,15 +335,15 @@ class NarrowLineRegion(LineRegion):
 
 
 # ====================================================================
-class HostGalaxy:
+class HostGalaxy(AGNComponent):
     def defaultValues(self):
         self._lum = 5.e43
         self._template = "Ell5"
 
     def __init__(self):
+        AGNComponent.__init__(self)
         self.defaultValues()
 
-    # -----------------------
     @property
     def luminosity(self):
         return self._lum
@@ -327,7 +354,6 @@ class HostGalaxy:
             raise ValueError("Luminosity must be a positive number")
         self._lum = value
 
-    # -----------------------
     @property
     def template(self):
         return self._template
@@ -336,8 +362,8 @@ class HostGalaxy:
     def template(self, value):
         self._template = value
 
-    # -----------------------
-    def intrinsic_spectrum(self, restlambda):
+    def spectrum(self, wavelength):
+        restlambda = wavelength / (1. + self._redshift)
         fileName = "swire/" + self._template + "_template_norm.sed"
         x = np.arange(0, dtype=float)
         y = np.arange(0, dtype=float)
@@ -348,21 +374,20 @@ class HostGalaxy:
         y /= np.interp(5500., x, y) * 5500.
         y *= self._lum
         a = np.interp(restlambda, x, y)
-        return a
-
+        return self._f2l * a
 
 
 # ====================================================================
-class Torus:
+class Torus(AGNComponent):
     def defaultValues(self):
         self._lum = 1.e44
         self._Tin  = 1500.
         self._Tout = 300.
 
     def __init__(self):
+        AGNComponent.__init__(self)
         self.defaultValues()
 
-    # -----------------------
     @property
     def luminosity(self):
         return self._lum
@@ -373,7 +398,6 @@ class Torus:
             raise ValueError("Luminosity must be a positive number")
         self._lum = value
 
-    # -----------------------
     @property
     def Tin(self):
         return self._Tin
@@ -384,7 +408,6 @@ class Torus:
             raise ValueError("Tin must be a positive number")
         self._Tout = value
 
-    # -----------------------
     @property
     def Tout(self):
         return self._Tout
@@ -395,139 +418,51 @@ class Torus:
             raise ValueError("Tout must be a positive number")
         self._Tout = value
 
-    # -----------------------
-    def intrinsic_spectrum(self, restlambda):
+    def spectrum(self, wavelength):
+        restlambda = wavelength / (1. + self._redshift)
         ll = restlambda * 1.e-8
         p = PhysicalConstants()
         out1 = 1. / ll**5. / (np.exp(p.h * p.c / (ll * p.k * self._Tin )) - 1.)
         out2 = 1. / ll**5. / (np.exp(p.h * p.c / (ll * p.k * self._Tout)) - 1.)
         out1 /= simps(out1, restlambda)
         out2 /= simps(out2, restlambda)
-        return self._lum * (out1+out2)
+        return self._f2l * self._lum * (out1+out2)
 
 
 # ====================================================================
 class AGNModel:
     def defaultValues(self):
-        self._norm_disk = 1.
-        self._norm_host = 1.
-        self._norm_blr  = 1.
-        self._norm_nlr  = 1.
-        self._norm_torus  = 1.
-
         self.disk = AccretionDisk()
         self.host = HostGalaxy()
         self.torus = Torus()
         self.blr = BroadLineRegion()
         self.nlr = NarrowLineRegion()
 
-        self._redshift = 0.5
-        self._viewangle = 30.
-
     def __init__(self):
         self.defaultValues()
 
-    # -----------------------
-    @property
-    def norm_disk(self):
-        return self._norm_disk
+    def spectrum(self, wavelength):
+        c1 = self.disk.spectrum(wavelength)
+        c2 = self.host.spectrum(wavelength)
+        c3 = self.torus.spectrum(wavelength)
+        c4 = self.blr.spectrum(wavelength)
+        c5 = self.nlr.spectrum(wavelength)
+        return (c1 + c2 + c3 + c4 + c5)
 
-    @norm_disk.setter
-    def norm_disk(self, value):
-        if value < 0:
-            raise ValueError("Norm_disk must be a positive number")
-        self._norm_disk = value
-
-    # -----------------------
-    @property
-    def norm_host(self):
-        return self._norm_host
-
-    @norm_host.setter
-    def norm_host(self, value):
-        if value < 0:
-            raise ValueError("Norm_host must be a positive number")
-        self._norm_host = value
-
-    # -----------------------
-    @property
-    def norm_blr(self):
-        return self._norm_blr
-
-    @norm_blr.setter
-    def norm_blr(self, value):
-        if value < 0:
-            raise ValueError("Norm_blr must be a positive number")
-        self._norm_blr = value
-
-    # -----------------------
-    @property
-    def norm_nlr(self):
-        return self._norm_nlr
-
-    @norm_nlr.setter
-    def norm_nlr(self, value):
-        if value < 0:
-            raise ValueError("Norm_nlr must be a positive number")
-        self._norm_nlr = value
-
-    # -----------------------
-    @property
-    def norm_torus(self):
-        return self._norm_torus
-
-    @norm_torus.setter
-    def norm_torus(self, value):
-        if value < 0:
-            raise ValueError("Norm_torus must be a positive number")
-        self._norm_torus = value
-
-    # -----------------------
-    @property
-    def redshift(self):
-        return self._redshift
-
-    @redshift.setter
-    def redshift(self, value):
-        if value < 0:
+    def observe(self, z=2., v=30.):
+        if z <= 0:
             raise ValueError("Redshift must be a positive number")
-        self._redshift = value
-
-    # -----------------------
-    @property
-    def viewangle(self):
-        return self._viewangle
-
-    @viewangle.setter
-    def viewangle(self, value):
-        if not (0 <= value < 90):
-            raise ValueError("viewangle must be in the range 0..90")
-        self._viewangle = value
-
-    def intrinsic_spectrum(self, restlambda):
-        spec = np.arange(restlambda.size, dtype=float)
-        spec *= 0.
-        spec += self._norm_disk  * self.disk.intrinsic_spectrum(restlambda)
-        spec += self._norm_host  * self.host.intrinsic_spectrum(restlambda)
-        spec += self._norm_torus * self.torus.intrinsic_spectrum(restlambda)
-        spec += self._norm_blr   * self.blr.intrinsic_spectrum(restlambda)
-        spec += self._norm_nlr   * self.nlr.intrinsic_spectrum(restlambda)
-        return spec
-
-    def observed_spectrum(self, obslambda):
-        restlambda = obslambda / (1. + self._redshift)
-        spec = np.arange(restlambda.size, dtype=float)
-        spec *= 0.
-        spec += self._norm_disk  * self.disk.intrinsic_spectrum(restlambda)  * 2. * math.cos(self._viewangle * 3.1416/180)
-        spec += self._norm_host  * self.host.intrinsic_spectrum(restlambda)
-        spec += self._norm_torus * self.torus.intrinsic_spectrum(restlambda)
-        spec += self._norm_blr   * self.blr.intrinsic_spectrum(restlambda)
-        spec += self._norm_nlr   * self.nlr.intrinsic_spectrum(restlambda)
+        if (v < 0)  |  (v > 90):
+            raise ValueError("Viewing angle must be in the range 0:90")
 
         p = PhysicalConstants()
         cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
-        Dl = cosmo.luminosity_distance(self._redshift)
+        Dl = cosmo.luminosity_distance(z)
         Dl = Dl.value * 1.e6 * p.pc
-        spec /= 4. * 3.1416 * Dl**2.
-        spec /= (1. + self._redshift)
-        return spec
+        f2l = 1 / (4. * 3.1416 * Dl**2.) / (1. + z)
+
+        self.disk._observe(z, v, f2l)
+        self.host._observe(z, v, f2l)
+        self.torus._observe(z, v, f2l)
+        self.blr._observe(z, v, f2l)
+        self.nlr._observe(z, v, f2l)
