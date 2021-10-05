@@ -51,7 +51,7 @@ agn.torus.luminosity = 1e44      # total integrated luminosity [erg s^-1], typic
 # Plot intrinsic (emitted) spectrum
 plt.title("Intrinsic spectrum")
 plt.xlabel("Wavelength [A] (rest frame)")
-plt.ylabel("Luminosity [erg s^{-1}]")
+plt.ylabel("λL_λ luminosity [erg s^{-1}]")
 
 # Prepare a grid of wavelengths to evaluate the model
 wl = np.logspace(2, 7, 5000)
@@ -71,7 +71,7 @@ plt.show()
 # Plot observed spectrum
 plt.title("Observed spectrum")
 plt.xlabel("Wavelength [A] (observer frame)")
-plt.ylabel("Flux [erg s^{-1} cm^{-2}]")
+plt.ylabel("λF_λ flux [erg s^{-1} cm^{-2}]")
 
 # Place the source at z=2 with a disk inclination of 30 degrees w.r.t
 # the line of sight (a pole on line of sight corresponds to 0 degrees)
