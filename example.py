@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import AGNModel as m
+import AGNMock as m
 
 # --------------------------------------------------------------------
-# Create an AGNModel object
-agn = m.AGNModel()
+# Create an AGNMock object
+agn = m.AGNMock()
 
 
 # --------------------------------------------------------------------

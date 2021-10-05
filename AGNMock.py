@@ -430,7 +430,7 @@ class Torus(AGNComponent):
 
 
 # ====================================================================
-class AGNModel:
+class AGNMock:
     def defaultValues(self):
         self.disk = AccretionDisk()
         self.host = HostGalaxy()
