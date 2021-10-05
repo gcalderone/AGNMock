@@ -11,32 +11,32 @@ agn = m.AGNModel()
 # Set model properties
 
 # BH mass
-agn.disk.bh_logmass = 9.         # log10(M / M_sun)
+agn.disk.bh_logmass = 8.         # log10(M / M_sun)
 
 # Accretion disk inner radius (used to calculate radiative efficiency
-agn.disk.rin = 3.                # gravitational radius: 6:Schwarzschild, 1:Maximally rotating, 9:Maximally counter-rotating
+agn.disk.rin = 6.                # gravitational radius: 6:Schwarzschild, 1:Maximally rotating, 9:Maximally counter-rotating
 
 # Disk emitted bolometric luminosity can be specified using one of the
 # following methods (the other quantities will be automatically
 # re-calculated):
-agn.disk.eddington_ratio = 0.01  # must be in the range (0,1)
-agn.disk.accrate = 1.            # accretion rate, M_sun yr^-1
-agn.disk.luminosity = 5e45       # erg / s
+agn.disk.eddington_ratio = 0.02  # must be in the range (0,1)
+agn.disk.accrate = 0.06          # accretion rate, M_sun yr^-1
+agn.disk.luminosity = 3e44       # erg / s
 
 # Broad line region
-agn.blr.luminosity = 1.5e41      # Luminosity of Ly-alpha [erg s^-1] (the remaining lines are scaled accordingly)
-agn.blr.fwhm  = 6e3              # FWHM of all lines in BLR [km s^-1]
+agn.blr.luminosity = 1.e42       # Luminosity of Ly-alpha [erg s^-1] (the remaining lines are scaled accordingly)
+agn.blr.fwhm  = 5e3              # FWHM of all lines in BLR [km s^-1]
 
 # Narrow line region
 agn.nlr.luminosity = 1.5e41      # Luminosity of Ly-alpha [erg s^-1] (the remaining lines are scaled accordingly)
-agn.nlr.fwhm  = 6e2              # FWHM of all lines in NLR [km s^-1]
+agn.nlr.fwhm  = 5e2              # FWHM of all lines in NLR [km s^-1]
 
 # Host galaxy
 agn.host.template = 'Ell5'       # Choose one from the SWIRE collection (http://www.iasf-milano.inaf.it/~polletta/templates/swire_templates.html)
 agn.host.luminosity = 5e43       # νL_ν luminosity @ 5500Å
 
 # Torus
-agn.torus.luminosity = 2e44      # total integrated luminosity [erg s^-1], typically ~1/3 of the disk bolometric luminosity
+agn.torus.luminosity = 1e44      # total integrated luminosity [erg s^-1], typically ~1/3 of the disk bolometric luminosity
 
 
 # The model already comes with pre-defined values when it is created.
